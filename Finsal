@@ -1,0 +1,117 @@
+#!/bin/bash
+### Authored by EnikFeirgraw
+### Special thanks to my alpha testers &
+### The many internet resources used for reference in building this
+TOTAL_ARGS=$#
+helpMenu () {
+        clear
+        echo "`tput setaf 5`This help menu will guide you to success in using Finsal. Please enjoy!`tput sgr0`"
+        echo
+        echo "How to prepare for use:"
+        echo
+        echo "Place all files needed to be bundled in a directory of your choosing"
+        echo "Example: /home/userperson/projectA"
+        echo
+        echo "In this folder, include all files to be bundled and your program to execute named 'installer'"
+        echo "Note: An extension is unnecessary, as the shebang in your script should specify whether it is bash, ksh, python, perl, etc."
+        echo
+        echo "When creating your installer/script use relative directory paths in order to utilize unpacked files"
+        echo "Example: cp ./fileUnpackedFromFinsal/ /usr/share/programDirectory/whatever"
+        echo
+        echo "As soon as all files are unpacked, your 'installed' script will execute"
+        echo
+        echo "#################################################################################################################################"
+        echo
+        echo "How to use Finsal:"
+        echo
+        echo "Using Finsal is fairly straight forward. Simply execute, and follow the on-screen prompts!"
+        echo "When Finsal completes, your script will be ready and already set with execute permissions"
+        echo "Note: To avoid any issues, run as SuperUser"
+        echo
+}
+if [[ $TOTAL_ARGS -ge 1 ]]; then
+        helpMenu
+        exit 0
+fi
+
+clear
+echo "`tput setaf 6`Welcome to Finsal, an automated builder for self extractable scripts!`tput sgr0`"
+echo "Press ctrl+c to quit at any time. Please ensure you have included a file named 'installer' in your files directory"
+echo
+echo "Enter location of files for inclusion:"
+read tarFiles
+echo
+echo "Enter name for script:"
+read progName
+
+##Creates decompression piece of output script
+cat > $progName.jsh <<'endmsg'
+#!/bin/bash
+### Created using Finsal, the self-extracting executable builder
+### Finsal was authored by EnikFeirgraw
+clear
+echo "Starting self extraction process. Please wait..."
+echo
+
+currentDir=`pwd`
+
+export TMPDIR=`mktemp -d /tmp/selfextract.XXXXXX`
+
+ARCHIVE=`awk '/^__ARCHIVE_BELOW__/ {print NR + 1; exit 0; }' $0`
+
+tail -n+$ARCHIVE $0 | tar xz -C $TMPDIR --checkpoint=100 --checkpoint-action=.
+
+cd $TMPDIR
+./installer
+
+cd $currentDir
+rm -rf $TMPDIR
+
+exit 0
+
+__ARCHIVE_BELOW__
+endmsg
+
+##Script Body
+echo
+echo "Building your script, please wait..."
+echo
+
+currentDir=`pwd`
+cd $tarFiles
+
+tar cf $currentDir/payload.tar ./* --checkpoint=100 --checkpoint-action=.
+echo
+cd $currentDir
+
+if [ -e "payload.tar" ]; then
+        echo "Compressing... Please Wait"
+        gzip payload.tar
+
+        if [ -e "payload.tar.gz" ]; then
+                cat payload.tar.gz >> $progName.jsh
+        else
+                echo "payload.tar.gz does not exist"
+                exit 1
+        fi
+else
+        echo "payload.tar does not exist"
+        exit 1
+fi
+
+echo
+echo "Note: For the safety of your original files, .jsh has been appended to your script"
+echo "`tput setaf 2`$progName.jsh successfully created!`tput sgr0`"
+echo
+
+##Cleanup
+if [ -e "payload.tar.gz" ]; then
+        rm -f payload.tar.gz
+fi
+
+##Give permissions to executable
+if [ -e "$progName.jsh" ]; then
+        chmod 755 $progName.jsh
+fi
+
+exit 0
